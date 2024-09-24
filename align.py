@@ -129,8 +129,7 @@ class phrase_aligner():
             if v > self.alignment_score_threshold
         ])]) / (len(xws) + len(yws))
 
-        img_alignment_map_args = ((Wp, Wa, Wp * Wa / (Wp * Wa).max()), xws, yws)
-        # img_alignment_map_args = ((Wa_xy, Wa_yx, Wa), xws, yws)
+        img_alignment_map_args = ((Wa_xy, Wa_yx, Wa), xws, yws)
 
         if self.verbose:
 
