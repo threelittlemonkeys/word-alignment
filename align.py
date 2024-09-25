@@ -97,6 +97,7 @@ class phrase_aligner():
 
     def align(self, xws, yws, xs, ys):
 
+        k = self.window_size - 1
         Wp = np.zeros((len(xws), len(yws)))
         xys = []
 
@@ -106,10 +107,11 @@ class phrase_aligner():
                 u = (phrase_score, (xr, yr), (xp, yp))
                 if phrase_score < self.phrase_score_threshold:
                     continue
-                xys.append(u)
+                if k <= xr[0] < xr[1] <= len(xws) - k \
+                and k <= yr[0] < yr[1] <= len(yws) - k:
+                    xys.append(u)
                 Wp[xr[0]:xr[1], yr[0]:yr[1]] += phrase_score
 
-        k = self.window_size - 1
         Wp = Wp[k:-k, k:-k]
         xws = xws[k:-k]
         yws = yws[k:-k]
@@ -139,8 +141,7 @@ class phrase_aligner():
 
             print("phrase_scores =")
             for phrase_score, (xr, yr), (xp, yp) in xys:
-                if (xp and yp and xp[0] != " " and yp[0] != " "):
-                    print(f"{phrase_score:.4f} {(xr, yr)} {(xp, yp)}")
+                print(f"{phrase_score:.4f} {(xr, yr)} {(xp, yp)}")
             print()
 
             print("alignment_scores =")
