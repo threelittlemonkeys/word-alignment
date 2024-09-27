@@ -102,44 +102,41 @@ class phrase_aligner():
         Wa_xy_argmax = {*zip(range(Wa.shape[0]), Wa.argmax(axis = 1))}
         Wa_yx_argmax = {*zip(Wa.argmax(axis = 0), range(Wa.shape[1]))}
 
-        alignment_idxs = {
-            idx for idx in Wa_xy_argmax & Wa_yx_argmax
-            # if Wa[idx] >= self.alignment_score_threshold
-        }
+        alignment_idxs = {*filter(
+            lambda idx: Wa[idx] >= self.alignment_score_threshold,
+            Wa_xy_argmax & Wa_yx_argmax
+        )}
 
         for i, j in (*alignment_idxs,):
-            for _Wa in (Wa_xy, Wa_yx):
 
-                for k in range(i, -1, -1):
-                    if _Wa[k][j] < self.alignment_score_threshold:
-                        break
-                    alignment_idxs.add((k, j))
-                    Wa[k][j] = max(Wa[k][j], _Wa[k][j])
+            for k in range(j, -1, -1):
+                if Wa_xy[i][k] < self.alignment_score_threshold:
+                    break
+                alignment_idxs.add((i, k))
+                Wa[i][k] = max(Wa_xy[i][k], Wa_yx[i][k])
 
-                for k in range(i, Wa.shape[0]):
-                    if _Wa[k][j] < self.alignment_score_threshold:
-                        break
-                    alignment_idxs.add((k, j))
-                    Wa[k][j] = max(Wa[k][j], _Wa[k][j])
+            for k in range(j, Wa.shape[1]):
+                if Wa_xy[i][k] < self.alignment_score_threshold:
+                    break
+                alignment_idxs.add((i, k))
+                Wa[i][k] = max(Wa_xy[i][k], Wa_yx[i][k])
 
-                for k in range(j, -1, -1):
-                    if _Wa[i][k] < self.alignment_score_threshold:
-                        break
-                    alignment_idxs.add((i, k))
-                    Wa[i][k] = max(Wa[i][k], _Wa[i][k])
+            for k in range(i, -1, -1):
+                if Wa_yx[k][j] < self.alignment_score_threshold:
+                    break
+                alignment_idxs.add((k, j))
+                Wa[k][j] = max(Wa_yx[k][j], Wa_yx[k][j])
 
-                for k in range(j, Wa.shape[1]):
-                    if _Wa[i][k] < self.alignment_score_threshold:
-                        break
-                    alignment_idxs.add((i, k))
-                    Wa[i][k] = max(Wa[i][k], _Wa[i][k])
+            for k in range(i, Wa.shape[0]):
+                if Wa_yx[k][j] < self.alignment_score_threshold:
+                    break
+                alignment_idxs.add((k, j))
+                Wa[k][j] = max(Wa_yx[k][j], Wa_yx[k][j])
 
-        alignment_scores = Wa[*zip(*alignment_idxs)]
-        alignment_score = sum(len(set(vs))
-            for vs in [*zip(*[(i, j)
-            for (i, j), v in zip(alignment_idxs, alignment_scores)
-            if v >= self.alignment_score_threshold
-        ])]) / (Wa.shape[0] + Wa.shape[1])
+        alignment_score = (
+            sum(Wa.max(axis = 1) > self.alignment_score_threshold)
+            + sum(Wa.max(axis = 0) > self.alignment_score_threshold)
+        ) / sum([*Wa.shape])
 
         return Wa, alignment_idxs, alignment_score
 
@@ -189,7 +186,7 @@ class phrase_aligner():
                 print(f"{Wa[i][j]:.4f} {(i, j)} {(xws[i], yws[j])}")
 
             print("\nalignment_map =")
-            txt_alignment_map(Wa, yws, xws, self.alignment_score_threshold)
+            txt_alignment_map(Wa, yws, xws)
             print()
 
         return alignment_score, img_alignment_map_args
