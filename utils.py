@@ -97,20 +97,20 @@ def txt_alignment_map(m, xws, yws, threshold = 0.01):
     xi = [str(i)[-1] for i in range(len(xws))]
     yi = [str(i)[-1] for i in range(len(yws))]
 
-    xwl = max(map(len, xws))
-    ywl = max(map(usl, yws))
+    xwl = max(map(usl, xws))
+    ywl = max(map(len, yws))
 
-    hl = "+" + "-" * (ywl + len(xws) * 2 + 4) + "+" # horizontal line
-    nd = " " * ywl # indent
+    hl = "+" + "-" * (xwl + len(yws) * 2 + 4) + "+" # horizontal line
+    nd = " " * xwl # indent
 
-    xws = [[" " * (2 - usl(c)) + c for c in w + " " * (xwl - len(w))] for w in xws]
-    yws = [" " * (ywl - usl(w)) + w for w in yws]
+    xws = [" " * (xwl - usl(w)) + w for w in xws]
+    yws = [[" " * (2 - usl(c)) + c for c in w + " " * (ywl - len(w))] for w in yws]
 
     print(hl)
     print("\n".join(" ".join(
-        ["|", w, i, *["." if y < threshold else "*" for y in ys], "|"]
-        ) for (w, i, ys) in zip(yws, yi, m)
+        ["|", w, i, *["." if x < threshold else "*" for x in xs], "|"]
+        ) for (w, i, xs) in zip(xws, xi, m)
     ))
-    print(" ".join(["|", nd, " ", *xi, "|"]))
-    print("\n".join(" ".join(["|", nd, "", "".join(cs), "|"]) for cs in zip(*xws)))
+    print(" ".join(["|", nd, " ", *yi, "|"]))
+    print("\n".join(" ".join(["|", nd, "", "".join(cs), "|"]) for cs in zip(*yws)))
     print(hl)

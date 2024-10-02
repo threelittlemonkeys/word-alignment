@@ -95,7 +95,7 @@ class phrase_aligner():
         for i in range(0, len(hs), 2):
             yield cosine_similarity(*hs[i: i + 2])
 
-    def alignment_score(self, Wa_xy, Wa_yx):
+    def word_alignment(self, Wa_xy, Wa_yx):
 
         Wa = Wa_xy * Wa_yx
 
@@ -107,32 +107,6 @@ class phrase_aligner():
             Wa_xy_argmax & Wa_yx_argmax
         )}
 
-        for i, j in (*alignment_idxs,):
-
-            for k in range(j, -1, -1):
-                if Wa_xy[i][k] < self.alignment_score_threshold:
-                    break
-                alignment_idxs.add((i, k))
-                Wa[i][k] = max(Wa_xy[i][k], Wa_yx[i][k])
-
-            for k in range(j, Wa.shape[1]):
-                if Wa_xy[i][k] < self.alignment_score_threshold:
-                    break
-                alignment_idxs.add((i, k))
-                Wa[i][k] = max(Wa_xy[i][k], Wa_yx[i][k])
-
-            for k in range(i, -1, -1):
-                if Wa_yx[k][j] < self.alignment_score_threshold:
-                    break
-                alignment_idxs.add((k, j))
-                Wa[k][j] = max(Wa_yx[k][j], Wa_yx[k][j])
-
-            for k in range(i, Wa.shape[0]):
-                if Wa_yx[k][j] < self.alignment_score_threshold:
-                    break
-                alignment_idxs.add((k, j))
-                Wa[k][j] = max(Wa_yx[k][j], Wa_yx[k][j])
-
         alignment_score = (
             sum(Wa.max(axis = 1) > self.alignment_score_threshold)
             + sum(Wa.max(axis = 0) > self.alignment_score_threshold)
@@ -140,11 +114,19 @@ class phrase_aligner():
 
         return Wa, alignment_idxs, alignment_score
 
+    def phrase_alignment(self, Wa, xys): # TODO
+
+        for phrase_score, (xr, yr), (xp, yp) in sorted(xys)[::-1]:
+            print(f"{phrase_score:.4f} {(xr, yr)} {(xp, yp)}")
+        input()
+
     def align(self, xws, yws, xs, ys):
 
         n = self.window_size - 1
-        Wp = np.zeros((len(xws), len(yws)))
+        Wa = np.zeros((len(xws), len(yws)))
         xys = []
+
+        # phrase scores
 
         for xr, xp, xh in zip(*xs):
             for yr, yp, yh in zip(*ys):
@@ -155,16 +137,24 @@ class phrase_aligner():
                 if n <= xr[0] < xr[1] <= len(xws) - n \
                 and n <= yr[0] < yr[1] <= len(yws) - n:
                     xys.append(u)
-                Wp[xr[0]:xr[1], yr[0]:yr[1]] += phrase_score
+                Wa[xr[0]:xr[1], yr[0]:yr[1]] += phrase_score
 
-        Wp = Wp[n:-n, n:-n]
+        # remove padding tokens
+
+        Wa = Wa[n:-n, n:-n]
         xws = xws[n:-n]
         yws = yws[n:-n]
 
-        Wa_xy = normalize(Wp, axis = 1, method = "softmax")
-        Wa_yx = normalize(Wp, axis = 0, method = "softmax")
+        # word alignment scores
 
-        Wa, alignment_idxs, alignment_score = self.alignment_score(Wa_xy, Wa_yx)
+        Wa_xy = normalize(Wa, axis = 1, method = "softmax")
+        Wa_yx = normalize(Wa, axis = 0, method = "softmax")
+
+        Wa, Wa_idxs, Wa_score = self.word_alignment(Wa_xy, Wa_yx)
+
+        # phrase alignment scores
+
+        self.phrase_alignment(Wa, xys)
 
         img_alignment_map_args = ((Wa_xy, Wa_yx, Wa), xws, yws)
 
@@ -179,17 +169,15 @@ class phrase_aligner():
                 print(f"{phrase_score:.4f} {(xr, yr)} {(xp, yp)}")
             print()
 
-            print("alignment_scores =")
-            for i, j in sorted(alignment_idxs):
-                if Wa[i][j] < Wa[i][j]:
-                    continue
+            print("word_alignment_scores =")
+            for i, j in sorted(Wa_idxs):
                 print(f"{Wa[i][j]:.4f} {(i, j)} {(xws[i], yws[j])}")
 
             print("\nalignment_map =")
-            txt_alignment_map(Wa, yws, xws)
+            txt_alignment_map(Wa, xws, yws)
             print()
 
-        return alignment_score, img_alignment_map_args
+        return Wa_score, img_alignment_map_args
 
 if __name__ == "__main__":
 
@@ -223,7 +211,7 @@ if __name__ == "__main__":
                 print(alignment_score, line, sep = "\t")
 
                 if aligner.verbose:
-                    img_alignment_map(*img_alignment_map_args)
+                    # img_alignment_map(*img_alignment_map_args)
                     input()
 
         if method == "sentence":
