@@ -69,26 +69,16 @@ def ngrams(tokens, maxlen):
         for j in range(i + 1, min(len(tokens), i + maxlen) + 1):
             yield (i, j), " ".join(tokens[i:j])
 
-def img_alignment_map(ms, xws, yws, threshold = 0.01):
+def img_alignment_map(m, xws, yws, threshold = 0.01):
 
-    _, axs = plt.subplots(ncols = len(ms))
-
-    if len(ms) == 1:
-        axs = [axs]
-
-    for ax, m in zip(axs, ms):
-
-        m = [[0 if x < threshold else x for x in y] for y in m]
-
-        sns.heatmap(
-            data = m,
-            cmap = "Reds",
-            cbar = False,
-            ax = ax,
-            xticklabels = yws,
-            yticklabels = xws,
-            annot = True
-        )
+    sns.heatmap(
+        data = [[0 if x < threshold else x for x in y] for y in m],
+        cmap = "Reds",
+        cbar = False,
+        xticklabels = yws,
+        yticklabels = xws,
+        annot = True
+    )
 
     plt.show()
 

@@ -96,44 +96,53 @@ class phrase_aligner():
         for i in range(0, len(hs), 2):
             yield cosine_similarity(*hs[i: i + 2])
 
-    def align_words(self, xws, yws, Wa_xy, Wa_yx):
+    def align_words(self, Wa, xws, yws):
+
+        Wa_xy = normalize(Wa, axis = 1, method = "softmax")
+        Wa_yx = normalize(Wa, axis = 0, method = "softmax")
 
         Wa = Wa_xy * Wa_yx
+        Wa *= (Wa >= self.alignment_score_threshold)
 
-        Wa_xy_argmax = {*zip(range(Wa.shape[0]), Wa.argmax(axis = 1))}
-        Wa_yx_argmax = {*zip(Wa.argmax(axis = 0), range(Wa.shape[1]))}
-
-        Wa_idxs = {*filter(
-            lambda idx: Wa[idx] >= self.alignment_score_threshold,
-            Wa_xy_argmax & Wa_yx_argmax
-        )}
-
-        Wa_score = (
-            sum(Wa.max(axis = 1) > self.alignment_score_threshold)
-            + sum(Wa.max(axis = 0) > self.alignment_score_threshold)
-        ) / sum([*Wa.shape])
+        Wa_xy_idxs = {*zip(range(Wa.shape[0]), Wa.argmax(axis = 1))}
+        Wa_yx_idxs = {*zip(Wa.argmax(axis = 0), range(Wa.shape[1]))}
+        Wa_idxs = Wa_xy_idxs & Wa_yx_idxs
+        Wa_score = len(Wa_idxs) * 2 / sum([*Wa.shape])
 
         if self.verbose:
-
             print("word_alignment_scores =")
             for i, j in sorted(Wa_idxs):
                 print(f"{Wa[i][j]:.4f} {(i, j)} {(xws[i], yws[j])}")
+            print()
 
         return Wa, Wa_idxs, Wa_score
 
-    def align_phrases(self, xys, Wa):
+    def align_phrases(self, Wa, xys):
 
-        Wp_idxs = [[-1] * Wa.size[0], [-1] * Wa.size[1]]
+        Wp = []
+        Wp_idxs = [[-1] * Wa.shape[0], [-1] * Wa.shape[1]]
 
-        for phrase_score, (xr, yr), (xp, yp) in sorted(xys)[::-1]:
-            
-            Wp = (Wa[xr[0]:xr[1], yr[0]:yr[1]] >= self.alignment_score_threshold).sum()
-            if not Wp:
+        for xy in sorted(xys)[::-1]:
+
+            _, ((x0, x1), (y0, y1)), _ = xy
+            A = (Wa[x0:x1, y0:y1] >= self.alignment_score_threshold).astype(int)
+
+            if not A.sum():
                 continue
-            print(f"{Wp} {phrase_score:.4f} {(xr, yr)} {(xp, yp)}")
 
-        if False and self.verbose:
+            # phrase boundary constraints
 
+            if x0 > 0 and 0 <= Wp_idxs[0][x0 - 1] == Wp_idxs[0][x0] \
+            or y0 > 0 and 0 <= Wp_idxs[1][y0 - 1] == Wp_idxs[1][y0] \
+            or x1 < Wa.shape[0] - 1 and 0 <= Wp_idxs[0][x1 - 1] == Wp_idxs[0][x1] \
+            or y1 < Wa.shape[1] - 1 and 0 <= Wp_idxs[1][y1 - 1] == Wp_idxs[1][y1]:
+                continue
+
+            Wp_idxs[0][x0:x1] = [len(Wp)] * (x1 - x0)
+            Wp_idxs[1][y0:y1] = [len(Wp)] * (y1 - y0)
+            Wp.append(xy)
+
+        if self.verbose:
             print("phrase_scores =")
             for phrase_score, (xr, yr), (xp, yp) in xys:
                 print(f"{phrase_score:.4f} {(xr, yr)} {(xp, yp)}")
@@ -167,24 +176,18 @@ class phrase_aligner():
 
         # word alignment
 
-        Wa_xy = normalize(Wa, axis = 1, method = "softmax")
-        Wa_yx = normalize(Wa, axis = 0, method = "softmax")
-
-        Wa, Wa_idxs, Wa_score = self.align_words(xws, yws, Wa_xy, Wa_yx)
+        Wa, Wa_idxs, Wa_score = self.align_words(Wa, xws, yws)
 
         # phrase alignment
 
-        self.align_phrases(xys, Wa)
-
-        img_alignment_map_args = ((Wa_xy, Wa_yx, Wa), xws, yws)
+        self.align_phrases(Wa, xys)
 
         if self.verbose:
-
             print("\nalignment_map =")
             txt_alignment_map(Wa, xws, yws)
-            print()
+            # img_alignment_map(Wa, xws, yws)
 
-        return Wa_score, img_alignment_map_args
+        return Wa_score
 
 if __name__ == "__main__":
 
@@ -198,7 +201,7 @@ if __name__ == "__main__":
         tgt_lang = tgt_lang,
         batch_size = 1024,
         window_size = 3,
-        thresholds = (0.5, 0.1),
+        thresholds = (0.7, 0.1),
         verbose = (len(sys.argv) == 6 and sys.argv[5] == "-v")
     )
 
@@ -214,11 +217,10 @@ if __name__ == "__main__":
         if method == "phrase":
 
             for line, data in zip(batch, aligner.preproc(batch)):
-                alignment_score, img_alignment_map_args = aligner.align(*data)
-                print(alignment_score, line, sep = "\t")
+                score = aligner.align(*data)
+                print(score, line, sep = "\t")
 
                 if aligner.verbose:
-                    # img_alignment_map(*img_alignment_map_args)
                     input()
 
         if method == "sentence":
