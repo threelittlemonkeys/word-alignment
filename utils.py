@@ -67,7 +67,8 @@ def ngrams(tokens, maxlen):
 
     for i in range(len(tokens)):
         for j in range(i + 1, min(len(tokens), i + maxlen) + 1):
-            yield (i, j), " ".join(tokens[i:j])
+            w = re.sub("\\s+", " ", " ".join(tokens[i:j])).strip()
+            yield (i, j), w
 
 def img_alignment_map(m, xws, yws, threshold = 0.01):
 
