@@ -76,6 +76,7 @@ class phrase_aligner():
             i += len(yps)
 
             if self.verbose:
+
                 print(f"\nsrc_text\t{x}")
                 print(f"tgt_text\t{y}")
                 print(f"src_tokens\t{xws[n:len(xws) - n]}")
@@ -109,26 +110,31 @@ class phrase_aligner():
         A_xy = {*zip(range(Wa.shape[0]), Wa.argmax(axis = 1))}
         A_yx = {*zip(Wa.argmax(axis = 0), range(Wa.shape[1]))}
 
-        A = {
+        Aw = {
             ((i, i + 1), (j, j + 1)): (Wa[i][j], (xws[i], yws[j]))
             for i, j in (A_xy & A_yx)
         }
 
         if self.verbose:
-            print("word_alignment_scores =")
-            for xyr, (alignment_score, xyp) in sorted(A.items()):
+
+            print("word_alignments =")
+            for xyr, (alignment_score, xyp) in sorted(Aw.items()):
                 print(f"{alignment_score:.4f} {xyr} {xyp}")
             print()
 
-        return Wa, A
+            # print("\nalignment_map =")
+            # txt_alignment_map(Wa, xws, yws)
+            # img_alignment_map(Wa, xws, yws)
 
-    def align_phrases(self, Wa, A, xys):
+        return Wa, Aw
+
+    def align_phrases(self, Wa, Aw, xys):
 
         Ma = (Wa > 0).astype(int)
         Ax = [None] * Wa.shape[0]
         Ay = [None] * Wa.shape[1]
 
-        for xyr in A:
+        for xyr in Aw:
             Ax[xyr[0][0]] = xys[xyr]
             Ay[xyr[1][0]] = xys[xyr]
 
@@ -151,18 +157,30 @@ class phrase_aligner():
             or y1 < Wa.shape[1] - 1 and None != Ay[y1] == Ay[y1 - 1]:
                 continue
 
-            # phrase collision
+            _xys = {*Ax[x0:x1], *Ay[y0:y1]} - {None}
+
+            if not _xys:
+                continue
+
+            _xrs, _yrs = zip(*[_xy[1] for _xy in _xys])
+            (_x0, _x1), (_y0, _y1) = zip(*_xrs), zip(*_yrs)
+
+            if x0 > min(_x0) or x1 < max(_x1) or y0 > min(_y0) or y1 < max(_y1):
+                continue
 
             Ax[x0:x1] = [xy] * (x1 - x0)
             Ay[y0:y1] = [xy] * (y1 - y0)
-            print(xy)
+
+        Ap = {*Ax, *Ay} - {None}
 
         if self.verbose:
-            print("phrase_scores =")
-            for xy in {*Ax, *Ay} - {None}:
-                phrase_score, (xr, yr), (xp, yp) = xy
-                print(f"{phrase_score:.4f} {(xr, yr)} {(xp, yp)}")
+            print("phrase_alignments =")
+            for xy in Ap:
+                phrase_score, xyr, xyp = xy
+                print(f"{phrase_score:.4f} {xyr} {xyp}")
             print()
+
+        return Ap
 
     def align(self, xws, yws, xs, ys):
 
@@ -188,20 +206,15 @@ class phrase_aligner():
                 if phrase_score >= self.phrase_score_threshold:
                     Wa[max(xr[0], 0):xr[1], max(yr[0], 0):yr[1]] += phrase_score
 
-        # word alignment
+        # alignment
 
-        Wa, A = self.align_words(Wa, xws, yws)
+        Wa, Aw = self.align_words(Wa, xws, yws)
+        Ap = self.align_phrases(Wa, Aw, xys)
 
-        # phrase alignment
-
-        self.align_phrases(Wa, A, xys)
-
-        score = len(A) * 2 / sum([*Wa.shape])
-
-        if self.verbose:
-            print("\nalignment_map =")
-            txt_alignment_map(Wa, xws, yws)
-            # img_alignment_map(Wa, xws, yws)
+        score = sum(
+            (xr[1] - xr[0]) + (yr[1] - yr[0])
+            for _, (xr, yr), _ in Ap
+        ) / sum(Wa.shape)
 
         return score
 
