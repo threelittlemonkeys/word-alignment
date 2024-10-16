@@ -105,7 +105,8 @@ class phrase_aligner():
         Wa_xy *= (Wa_xy >= self.alignment_score_threshold)
         Wa_yx *= (Wa_yx >= self.alignment_score_threshold)
 
-        Wa = Wa_xy * Wa_yx
+        # Wa = Wa_xy * Wa_yx
+        Wa = np.maximum(Wa_xy, Wa_yx)
 
         A_xy = {*zip(range(Wa.shape[0]), Wa.argmax(axis = 1))}
         A_yx = {*zip(Wa.argmax(axis = 0), range(Wa.shape[1]))}
@@ -121,10 +122,6 @@ class phrase_aligner():
             for xyr, (alignment_score, xyp) in sorted(Aw.items()):
                 print(f"{alignment_score:.4f} {xyr} {xyp}")
             print()
-
-            # print("\nalignment_map =")
-            # txt_alignment_map(Wa, xws, yws)
-            # img_alignment_map(Wa, xws, yws)
 
         return Wa, Aw
 
@@ -210,6 +207,10 @@ class phrase_aligner():
 
         Wa, Aw = self.align_words(Wa, xws, yws)
         Ap = self.align_phrases(Wa, Aw, xys)
+
+        # print("\nalignment_map =")
+        # txt_alignment_map(Wa, xws, yws)
+        # img_alignment_map(Wa, xws, yws)
 
         score = sum(
             (xr[1] - xr[0]) + (yr[1] - yr[0])
