@@ -125,11 +125,38 @@ class phrase_aligner():
 
         return Wa, Aw
 
+    def cluster_phrases(self, m):
+
+        def _func(m, i, j, k):
+
+            m[i][j] = k
+
+            if i > 0 and m[i - 1][j] < 0:
+                _func(m, i - 1, j, k)
+            if j > 0 and m[i][j - 1] < 0:
+                _func(m, i, j - 1, k)
+            if i < m.shape[0] - 1 and m[i + 1][j] < 0:
+                _func(m, i + 1, j, k)
+            if j < m.shape[1] - 1 and m[i][j + 1] < 0:
+                _func(m, i, j + 1, k)
+
+        k = 1
+        m *= -1
+
+        for i in range(m.shape[0]):
+            for j in range(m.shape[1]):
+                if m[i][j] >= 0:
+                    continue
+                _func(m, i, j, k)
+                k += 1
+
     def align_phrases(self, Wa, Aw, xys):
 
         Ma = (Wa > 0).astype(int)
         Ax = [None] * Wa.shape[0]
         Ay = [None] * Wa.shape[1]
+
+        self.cluster_phrases(Ma)
 
         for xyr in Aw:
             Ax[xyr[0][0]] = xys[xyr]
@@ -144,14 +171,17 @@ class phrase_aligner():
                 continue
 
             if not m.sum():
+                pass # continue
+
+            if len({*m.flatten()} - {0}) != 1:
                 continue
 
             # phrase boundary constraints
 
-            if x0 > 0 and None != Ax[x0] == Ax[x0 - 1] \
-            or y0 > 0 and None != Ay[y0] == Ay[y0 - 1] \
-            or x1 < Wa.shape[0] - 1 and None != Ax[x1] == Ax[x1 - 1] \
-            or y1 < Wa.shape[1] - 1 and None != Ay[y1] == Ay[y1 - 1]:
+            if x0 > 0 and Ax[x0] == Ax[x0 - 1] != None \
+            or y0 > 0 and Ay[y0] == Ay[y0 - 1] != None \
+            or x1 < Wa.shape[0] - 1 and Ax[x1] == Ax[x1 - 1] != None \
+            or y1 < Wa.shape[1] - 1 and Ay[y1] == Ay[y1 - 1] != None:
                 continue
 
             _xys = {*Ax[x0:x1], *Ay[y0:y1]} - {None}
@@ -160,10 +190,19 @@ class phrase_aligner():
                 continue
 
             _xrs, _yrs = zip(*[_xy[1] for _xy in _xys])
-            (_x0, _x1), (_y0, _y1) = zip(*_xrs), zip(*_yrs)
+            _xrs, _yrs = [*zip(*_xrs)], [*zip(*_yrs)]
+            _x0, _x1 = min(_xrs[0]), max(_xrs[1])
+            _y0, _y1 = min(_yrs[0]), max(_yrs[1])
 
+            '''
             if x0 > min(_x0) or x1 < max(_x1) or y0 > min(_y0) or y1 < max(_y1):
                 continue
+            '''
+            print(_xys)
+            print(Ma[_x0:_x1, _y0:_y1])
+            print(xy)
+            print(m)
+            print()
 
             Ax[x0:x1] = [xy] * (x1 - x0)
             Ay[y0:y1] = [xy] * (y1 - y0)
@@ -208,14 +247,16 @@ class phrase_aligner():
         Wa, Aw = self.align_words(Wa, xws, yws)
         Ap = self.align_phrases(Wa, Aw, xys)
 
-        # print("\nalignment_map =")
-        # txt_alignment_map(Wa, xws, yws)
-        # img_alignment_map(Wa, xws, yws)
-
         score = sum(
             (xr[1] - xr[0]) + (yr[1] - yr[0])
             for _, (xr, yr), _ in Ap
         ) / sum(Wa.shape)
+
+        if self.verbose:
+            print("alignment_map =")
+            txt_alignment_map(Wa, xws, yws)
+            # img_alignment_map(Wa, xws, yws)
+            print()
 
         return score
 
