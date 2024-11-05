@@ -194,15 +194,8 @@ class phrase_aligner():
             _x0, _x1 = min(_xrs[0]), max(_xrs[1])
             _y0, _y1 = min(_yrs[0]), max(_yrs[1])
 
-            '''
-            if x0 > min(_x0) or x1 < max(_x1) or y0 > min(_y0) or y1 < max(_y1):
+            if _x0 < x0 or x1 < _x1 or _y0 < y0 or y1 < _y1:
                 continue
-            '''
-            print(_xys)
-            print(Ma[_x0:_x1, _y0:_y1])
-            print(xy)
-            print(m)
-            print()
 
             Ax[x0:x1] = [xy] * (x1 - x0)
             Ay[y0:y1] = [xy] * (y1 - y0)
